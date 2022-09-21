@@ -11,6 +11,7 @@ enum S {
     I32(i32),
     Symbol(String),
     Add,
+    Mul,
 }
 
 impl S {
@@ -40,6 +41,31 @@ impl S {
                     }
                 }
                 Ok(S::I32(sum))
+            }
+            S::Mul => {
+                let mut prod = 1;
+                let mut s = args;
+                loop {
+                    match s {
+                        S::Nil => break,
+                        S::Cons { car, cdr } => match car.evaluate(&context) {
+                            Err(error) => return Err(error),
+                            Ok(car) => match car {
+                                S::I32(v) => {
+                                    prod *= v;
+                                    s = *cdr;
+                                }
+                                _ => {
+                                    return Err(
+                                        "Mul Error: non-numeric values cannot be multiplied.",
+                                    )
+                                }
+                            },
+                        },
+                        _ => return Err("Mul Error: arguments is not a list."),
+                    }
+                }
+                Ok(S::I32(prod))
             }
             _ => Err("Invalid apply: List's first element must be applyable."),
         }
@@ -86,6 +112,7 @@ impl S {
             S::I32(v) => print!("{v}"),
             S::Symbol(symbol) => print!("{symbol}"),
             S::Add => print!("ADD"),
+            S::Mul => print!("MUL"),
         }
     }
 
@@ -229,6 +256,7 @@ fn main() {
                 Ok(s) => {
                     let mut context = Context::new();
                     context.insert(String::from("+"), S::Add);
+                    context.insert(String::from("*"), S::Mul);
                     match s.evaluate(&context) {
                         Err(error) => println!("{error}"),
                         Ok(s) => s.print(),
