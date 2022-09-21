@@ -108,7 +108,7 @@ enum Token {
     CP,
 }
 
-fn readi32(chars: &mut Peekable<Chars>) -> Result<i32, ParseIntError> {
+fn read_i32(chars: &mut Peekable<Chars>) -> Result<i32, ParseIntError> {
     let mut digits = String::new();
     while match chars.peek() {
         None => false,
@@ -140,7 +140,7 @@ fn tokenize(target: &str) -> Result<Vec<Token>, &'static str> {
                 continue;
             }
             Some(c) if c.is_numeric() => {
-                tokens.push(Token::Num(readi32(&mut target).unwrap()));
+                tokens.push(Token::Num(read_i32(&mut target).unwrap()));
                 continue;
             }
             _ => return Err("Cannot Tokenize"),
