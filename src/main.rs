@@ -1,79 +1,119 @@
-use std::{io::stdin, iter::Peekable, num::ParseIntError, slice::Iter, str::Chars};
+use std::{
+    collections::HashMap, io::stdin, iter::Peekable, num::ParseIntError, slice::Iter, str::Chars,
+};
 
-trait S {
-    fn evaluate(&self) -> Box<dyn S>;
-    fn print(&self);
-}
+type Context = HashMap<String, S>;
 
-enum List {
-    Cons { car: Box<dyn S>, cdr: Box<List> },
+#[derive(Clone)]
+enum S {
+    Cons { car: Box<S>, cdr: Box<S> },
     Nil,
+    I32(i32),
+    Symbol(String),
+    Add,
 }
 
-impl List {
-    fn append(self, s: Box<dyn S>) -> List {
+impl S {
+    fn apply(&self, args: S, context: &Context) -> Result<S, &'static str> {
         match self {
-            List::Nil => List::Cons {
-                car: s,
-                cdr: Box::new(List::Nil),
-            },
-            List::Cons { car, cdr } => List::Cons {
-                car: car,
-                cdr: Box::new(cdr.append(s)),
-            },
+            S::Add => {
+                let mut sum = 0;
+                let mut s = args;
+                loop {
+                    match s {
+                        S::Nil => break,
+                        S::Cons { car, cdr } => match car.evaluate(&context) {
+                            Err(error) => return Err(error),
+                            Ok(car) => match car {
+                                S::I32(v) => {
+                                    sum += v;
+                                    s = *cdr;
+                                }
+                                _ => return Err("Add Error: cannot add not a number."),
+                            },
+                        },
+                        _ => return Err("Add Error: arguments is not a list."),
+                    }
+                }
+                Ok(S::I32(sum))
+            }
+            _ => Err("Invalid apply: List's first element must be applyable."),
         }
     }
-}
-
-impl S for List {
-    fn evaluate(&self) -> Box<dyn S> {
-        todo!()
+    fn evaluate(&self, context: &Context) -> Result<S, &'static str> {
+        match self {
+            S::Cons { car, cdr } => match car.evaluate(context) {
+                Err(error) => Err(error),
+                Ok(s) => s.apply((**cdr).clone(), context),
+            },
+            S::Symbol(symbol) => match context.get(symbol) {
+                None => Err("Symbol does not exist."),
+                Some(s) => Ok(s.clone()),
+            },
+            other => Ok(other.clone()),
+        }
     }
-
     fn print(&self) {
         match self {
-            List::Nil => print!("()"),
-            List::Cons { car, cdr } => {
+            S::Cons { car, cdr } => {
                 print!("(");
                 car.print();
-                let mut list = &**cdr;
+                let mut list = (**cdr).clone();
                 loop {
                     match list {
-                        List::Nil => {
+                        S::Nil => {
                             print!(")");
                             break;
                         }
-                        List::Cons { car, cdr } => {
+                        S::Cons { car, cdr } => {
                             print!(" ");
                             car.print();
-                            list = &**cdr;
+                            list = *cdr;
+                        }
+                        other => {
+                            print!(" . ");
+                            other.print();
+                            break;
                         }
                     }
                 }
             }
+            S::Nil => print!("()"),
+            S::I32(v) => print!("{v}"),
+            S::Symbol(symbol) => print!("{symbol}"),
+            S::Add => print!("ADD"),
+        }
+    }
+
+    fn append(self, s: S) -> Result<S, &'static str> {
+        match self {
+            S::Cons { car, cdr } => {
+                let car = car;
+                let cdr = cdr.append(s);
+                match cdr {
+                    Ok(cdr) => Ok(S::Cons {
+                        car: car,
+                        cdr: Box::new(cdr),
+                    }),
+                    Err(error) => Err(error),
+                }
+            }
+            S::Nil => Ok(S::Cons {
+                car: Box::new(s),
+                cdr: Box::new(S::Nil),
+            }),
+            _ => Err("Not a list"),
         }
     }
 }
 
-struct I32(i32);
-
-impl S for I32 {
-    fn evaluate(&self) -> Box<dyn S> {
-        let I32(v) = self;
-        Box::new(I32(*v))
-    }
-
-    fn print(&self) {
-        print!("{}", self.0);
-    }
-}
-
-fn parse(tokens: &mut Peekable<Iter<Token>>) -> Result<Box<dyn S>, &'static str> {
+fn parse(tokens: &mut Peekable<Iter<Token>>) -> Result<S, &'static str> {
     match tokens.peek() {
         None => Err("No tokens"),
-        Some(Token::Num(v)) => Ok(Box::new(I32(*v))),
+        Some(Token::Num(v)) => Ok(S::I32(*v)),
+        Some(Token::Symbol(symbol)) => Ok(S::Symbol(symbol.clone())),
         Some(Token::OP) => {
-            let mut list = List::Nil;
+            let mut list = S::Nil;
             loop {
                 tokens.next();
                 match tokens.peek() {
@@ -81,21 +121,27 @@ fn parse(tokens: &mut Peekable<Iter<Token>>) -> Result<Box<dyn S>, &'static str>
                     Some(Token::CP) => {
                         break;
                     }
-                    Some(Token::Num(v)) => {
-                        list = list.append(Box::new(I32(*v)));
-                    }
+                    Some(Token::Num(v)) => match list.append(S::I32(*v)) {
+                        Ok(l) => list = l,
+                        Err(error) => return Err(error),
+                    },
+                    Some(Token::Symbol(symbol)) => match list.append(S::Symbol(symbol.clone())) {
+                        Ok(l) => list = l,
+                        Err(error) => return Err(error),
+                    },
                     Some(Token::OP) => {
                         let parsed = parse(tokens);
                         match parsed {
                             Err(error) => return Err(error),
-                            Ok(s) => {
-                                list = list.append(s);
-                            }
+                            Ok(s) => match list.append(s) {
+                                Ok(l) => list = l,
+                                Err(error) => return Err(error),
+                            },
                         }
                     }
                 }
             }
-            Ok(Box::new(list))
+            Ok(list)
         }
         Some(Token::CP) => Err("Missing open parenthesis"),
     }
@@ -105,6 +151,7 @@ fn parse(tokens: &mut Peekable<Iter<Token>>) -> Result<Box<dyn S>, &'static str>
 enum Token {
     OP,
     Num(i32),
+    Symbol(String),
     CP,
 }
 
@@ -117,6 +164,17 @@ fn read_i32(chars: &mut Peekable<Chars>) -> Result<i32, ParseIntError> {
         digits.push(chars.next().unwrap());
     }
     digits.parse::<i32>()
+}
+
+fn read_symbol(chars: &mut Peekable<Chars>) -> String {
+    let mut string = String::new();
+    while match chars.peek() {
+        None => false,
+        Some(c) => !c.is_whitespace() && *c != '(' && *c != ')',
+    } {
+        string.push(chars.next().unwrap());
+    }
+    string
 }
 
 fn tokenize(target: &str) -> Result<Vec<Token>, &'static str> {
@@ -143,7 +201,10 @@ fn tokenize(target: &str) -> Result<Vec<Token>, &'static str> {
                 tokens.push(Token::Num(read_i32(&mut target).unwrap()));
                 continue;
             }
-            _ => return Err("Cannot Tokenize"),
+            Some(_) => {
+                tokens.push(Token::Symbol(read_symbol(&mut target)));
+                continue;
+            }
         }
     }
     Ok(tokens)
@@ -162,7 +223,12 @@ fn main() {
             match parse(&mut tokens) {
                 Err(error) => println!("{error}"),
                 Ok(s) => {
-                    s.print();
+                    let mut context = Context::new();
+                    context.insert(String::from("+"), S::Add);
+                    match s.evaluate(&context) {
+                        Err(error) => println!("{error}"),
+                        Ok(s) => s.print(),
+                    }
                 }
             }
         }
