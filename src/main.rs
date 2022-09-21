@@ -29,7 +29,11 @@ impl S {
                                     sum += v;
                                     s = *cdr;
                                 }
-                                _ => return Err("Add Error: cannot add not a number."),
+                                _ => {
+                                    return Err(
+                                        "Add Error: non-numeric values cannot be multiplied.",
+                                    )
+                                }
                             },
                         },
                         _ => return Err("Add Error: arguments is not a list."),
