@@ -147,8 +147,8 @@ impl S {
             S::Add => print!("ADD"),
             S::Mul => print!("MUL"),
             S::Let => print!("LET"),
-            S::True => print!("True"),
-            S::False => print!("False"),
+            S::True => print!("TRUE"),
+            S::False => print!("FALSE"),
         }
     }
 
@@ -294,8 +294,8 @@ fn main() {
                     context.insert(String::from("+"), S::Add);
                     context.insert(String::from("*"), S::Mul);
                     context.insert(String::from("let"), S::Let);
-                    context.insert(String::from("True"), S::True);
-                    context.insert(String::from("False"), S::False);
+                    context.insert(String::from("true"), S::True);
+                    context.insert(String::from("false"), S::False);
                     match s.evaluate(&context) {
                         Err(error) => println!("{error}"),
                         Ok(s) => s.print(),
