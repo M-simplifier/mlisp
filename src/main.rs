@@ -13,6 +13,8 @@ enum S {
     Add,
     Mul,
     Let,
+    True,
+    False,
 }
 
 impl S {
@@ -145,6 +147,8 @@ impl S {
             S::Add => print!("ADD"),
             S::Mul => print!("MUL"),
             S::Let => print!("LET"),
+            S::True => print!("True"),
+            S::False => print!("False"),
         }
     }
 
@@ -290,6 +294,8 @@ fn main() {
                     context.insert(String::from("+"), S::Add);
                     context.insert(String::from("*"), S::Mul);
                     context.insert(String::from("let"), S::Let);
+                    context.insert(String::from("True"), S::True);
+                    context.insert(String::from("False"), S::False);
                     match s.evaluate(&context) {
                         Err(error) => println!("{error}"),
                         Ok(s) => s.print(),
