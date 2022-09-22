@@ -15,6 +15,7 @@ enum S {
     Let,
     True,
     False,
+    If,
 }
 
 impl S {
@@ -100,6 +101,46 @@ impl S {
                     _ => Err("Let Error: arguments is not a list."),
                 }
             }
+            S::If => match args {
+                S::Cons { car, cdr } => match car.evaluate(&context) {
+                    Err(error) => Err(error),
+                    Ok(s) => match s {
+                        S::True => match *cdr {
+                            S::Cons { car, cdr } => match *cdr {
+                                S::Cons { car: _, cdr } => match *cdr {
+                                    S::Nil => car.evaluate(&context),
+                                    S::Cons { car: _, cdr: _ } => {
+                                        Err("If Error: too many arguments.")
+                                    }
+                                    _ => Err("If Error: arguments is not a list."),
+                                },
+                                S::Nil => Err("If Error: too few arguments."),
+                                _ => Err("If Error: arguments is not a list."),
+                            },
+                            S::Nil => Err("If Error: too few arguments."),
+                            _ => Err("If Error: arguments is not a list."),
+                        },
+                        S::False => match *cdr {
+                            S::Cons { car: _, cdr } => match *cdr {
+                                S::Cons { car, cdr } => match *cdr {
+                                    S::Nil => car.evaluate(&context),
+                                    S::Cons { car: _, cdr: _ } => {
+                                        Err("If Error: too many arguments.")
+                                    }
+                                    _ => Err("If Error: arguments is not a list."),
+                                },
+                                S::Nil => Err("If Error: too few arguments."),
+                                _ => Err("If Error: arguments is not a list."),
+                            },
+                            S::Nil => Err("If Error: too few arguments."),
+                            _ => Err("If Error: arguments is not a list."),
+                        },
+                        _ => Err("If Error: first argument must be a boolean."),
+                    },
+                },
+                S::Nil => Err("If Error: too few arguments."),
+                _ => Err("If Errlr: arguments is not a list."),
+            },
             _ => Err("Invalid apply: List's first element must be applyable."),
         }
     }
@@ -149,6 +190,7 @@ impl S {
             S::Let => print!("LET"),
             S::True => print!("TRUE"),
             S::False => print!("FALSE"),
+            S::If => print!("IF"),
         }
     }
 
@@ -296,6 +338,7 @@ fn main() {
                     context.insert(String::from("let"), S::Let);
                     context.insert(String::from("true"), S::True);
                     context.insert(String::from("false"), S::False);
+                    context.insert(String::from("if"), S::If);
                     match s.evaluate(&context) {
                         Err(error) => println!("{error}"),
                         Ok(s) => s.print(),
