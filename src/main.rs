@@ -12,6 +12,7 @@ enum S {
     Symbol(String),
     Add,
     Mul,
+    Let,
 }
 
 impl S {
@@ -67,6 +68,36 @@ impl S {
                 }
                 Ok(S::I32(prod))
             }
+            S::Let => {
+                let mut context = context.clone();
+                match args {
+                    S::Cons { car, cdr } => match *car {
+                        S::Symbol(symbol) => match *cdr {
+                            S::Cons { car, cdr } => match car.evaluate(&context) {
+                                Err(error) => Err(error),
+                                Ok(s) => {
+                                    context.insert(symbol, s);
+                                    match *cdr {
+                                        S::Cons { car, cdr } => match *cdr {
+                                            S::Nil => car.evaluate(&context),
+                                            S::Cons { car: _, cdr: _ } => {
+                                                Err("Let Error: too many arguments.")
+                                            }
+                                            _ => Err("Let Error: arguments is not a list."),
+                                        },
+                                        S::Nil => Err("Let Error: too few arguments."),
+                                        _ => Err("Let Error: arguments is not a list."),
+                                    }
+                                }
+                            },
+                            S::Nil => Err("Let Error: too few arguments."),
+                            _ => Err("Let Error: arguments is not a list."),
+                        },
+                        _ => Err("Let Error: first argument must be a symbol."),
+                    },
+                    _ => Err("Let Error: arguments is not a list."),
+                }
+            }
             _ => Err("Invalid apply: List's first element must be applyable."),
         }
     }
@@ -113,6 +144,7 @@ impl S {
             S::Symbol(symbol) => print!("{symbol}"),
             S::Add => print!("ADD"),
             S::Mul => print!("MUL"),
+            S::Let => print!("LET"),
         }
     }
 
@@ -257,6 +289,7 @@ fn main() {
                     let mut context = Context::new();
                     context.insert(String::from("+"), S::Add);
                     context.insert(String::from("*"), S::Mul);
+                    context.insert(String::from("let"), S::Let);
                     match s.evaluate(&context) {
                         Err(error) => println!("{error}"),
                         Ok(s) => s.print(),
