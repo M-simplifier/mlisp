@@ -139,7 +139,7 @@ impl S {
                     },
                 },
                 S::Nil => Err("If Error: too few arguments."),
-                _ => Err("If Errlr: arguments is not a list."),
+                _ => Err("If Error: arguments is not a list."),
             },
             _ => Err("Invalid apply: List's first element must be applyable."),
         }
@@ -201,7 +201,7 @@ impl S {
                 let cdr = cdr.append(s);
                 match cdr {
                     Ok(cdr) => Ok(S::Cons {
-                        car: car,
+                        car,
                         cdr: Box::new(cdr),
                     }),
                     Err(error) => Err(error),
