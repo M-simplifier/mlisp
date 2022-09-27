@@ -16,10 +16,25 @@ enum S {
     True,
     False,
     If,
+    Lambda,
+    Func { symbol: String, body: Box<S> },
 }
 
 impl S {
-    fn apply(&self, args: S, context: &Context) -> Result<S, &'static str> {
+    fn freeze_context(&self, context: &Context) -> S {
+        match self {
+            S::Cons { car, cdr } => S::Cons {
+                car: Box::new(car.freeze_context(context)),
+                cdr: Box::new(cdr.freeze_context(context)),
+            },
+            S::Symbol(symbol) => match context.get(symbol) {
+                Some(s) => s.clone(),
+                _ => self.clone(),
+            },
+            other => other.clone(),
+        }
+    }
+    fn apply(self, args: S, context: &Context) -> Result<S, &'static str> {
         match self {
             S::Add => {
                 let mut sum = 0;
@@ -141,16 +156,46 @@ impl S {
                 S::Nil => Err("If Error: too few arguments."),
                 _ => Err("If Error: arguments is not a list."),
             },
+            S::Lambda => match args {
+                S::Cons { car, cdr } => match *car {
+                    S::Symbol(symbol) => match *cdr {
+                        S::Cons { car, cdr } => match *cdr {
+                            S::Nil => Ok(S::Func { symbol, body: car }),
+                            S::Cons { car: _, cdr: _ } => Err("Lambda Error: too many arguments."),
+                            _ => Err("Lambda Error: arguments is not a list."),
+                        },
+                        S::Nil => Err("Lambda Error: too few arguments."),
+                        _ => Err("Lambda Error: arguments is not a list."),
+                    },
+                    _ => Err("Lambda Error: first argument must be a symbol."),
+                },
+                S::Nil => Err("Lambda Error: too few arguments."),
+                _ => Err("Lambda Error: arguments is not a list."),
+            },
+            S::Func { symbol, body } => match args {
+                S::Cons { car, cdr } => match *cdr {
+                    S::Nil => {
+                        let mut context = context.clone();
+                        context.insert(symbol, *car);
+                        body.evaluate(&context)
+                    }
+                    S::Cons { car: _, cdr: _ } => Err("Func Error: too many arguments."),
+                    _ => Err("Func Error: arguments is not a list."),
+                },
+                S::Nil => Err("Func Error: too few arguments."),
+                _ => Err("Func Error: arguments is not a list."),
+            },
             _ => Err("Invalid apply: List's first element must be applyable."),
         }
     }
     fn evaluate(&self, context: &Context) -> Result<S, &'static str> {
-        match self {
+        let s = self.freeze_context(context);
+        match s {
             S::Cons { car, cdr } => match car.evaluate(context) {
                 Err(error) => Err(error),
-                Ok(s) => s.apply((**cdr).clone(), context),
+                Ok(s) => s.apply(*cdr.clone(), context),
             },
-            S::Symbol(symbol) => match context.get(symbol) {
+            S::Symbol(symbol) => match context.get(&symbol) {
                 None => Err("Symbol does not exist."),
                 Some(s) => Ok(s.clone()),
             },
@@ -191,6 +236,11 @@ impl S {
             S::True => print!("TRUE"),
             S::False => print!("FALSE"),
             S::If => print!("IF"),
+            S::Lambda => print!("LAMBDA"),
+            S::Func { symbol, body } => {
+                print!("λ {symbol} . ");
+                body.print()
+            }
         }
     }
 
@@ -339,6 +389,7 @@ fn main() {
                     context.insert(String::from("true"), S::True);
                     context.insert(String::from("false"), S::False);
                     context.insert(String::from("if"), S::If);
+                    context.insert(String::from("lambda"), S::Lambda);
                     match s.evaluate(&context) {
                         Err(error) => println!("{error}"),
                         Ok(s) => s.print(),
