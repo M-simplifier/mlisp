@@ -18,6 +18,7 @@ enum S {
     If,
     Lambda,
     Func { symbol: String, body: Box<S> },
+    Greater,
 }
 
 impl S {
@@ -86,6 +87,48 @@ impl S {
                 }
                 Ok(S::I32(prod))
             }
+            S::Greater => match args {
+                S::Cons { car, cdr } => match car.evaluate(context) {
+                    Ok(s) => match s {
+                        S::I32(lval) => match *cdr {
+                            S::Cons { car, cdr } => match car.evaluate(context) {
+                                Ok(s) => match s {
+                                    S::I32(rval) => match *cdr {
+                                        S::Nil => {
+                                            if lval < rval {
+                                                Ok(S::True)
+                                            } else {
+                                                Ok(S::False)
+                                            }
+                                        }
+                                        _ => {
+                                            todo!("Error handling")
+                                        }
+                                    },
+                                    _ => {
+                                        todo!("Error handling")
+                                    }
+                                },
+                                Err(error) => {
+                                    todo!()
+                                }
+                            },
+                            _ => {
+                                todo!("Error handling")
+                            }
+                        },
+                        _ => {
+                            todo!("Error handling")
+                        }
+                    },
+                    Err(error) => {
+                        todo!()
+                    }
+                },
+                _ => {
+                    todo!("Error handling")
+                }
+            },
             S::Let => {
                 let mut context = context.clone();
                 match args {
@@ -241,6 +284,7 @@ impl S {
                 print!("λ {symbol} . ");
                 body.print()
             }
+            S::Greater => print!("<"),
         }
     }
 
@@ -390,6 +434,7 @@ fn main() {
                     context.insert(String::from("false"), S::False);
                     context.insert(String::from("if"), S::If);
                     context.insert(String::from("lambda"), S::Lambda);
+                    context.insert(String::from("<"), S::Greater);
                     match s.evaluate(&context) {
                         Err(error) => println!("{error}"),
                         Ok(s) => s.print(),
