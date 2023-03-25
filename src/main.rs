@@ -74,16 +74,11 @@ impl S {
                 loop {
                     match s {
                         S::Nil => break,
-                        S::Cons { car, cdr } => match car.evaluate(&context) {
-                            Err(error) => return Err(error),
-                            Ok(car) => match car {
-                                S::I32(v) => {
-                                    sum += v;
-                                    s = *cdr;
-                                }
-                                _ => return Err("Add Error: non-numeric values cannot be added."),
-                            },
-                        },
+                        S::Cons { car, cdr } => {
+                            let value = car.evaluate(&context)?.as_i32()?;
+                            sum += value;
+                            s = *cdr;
+                        }
                         _ => return Err("Add Error: arguments is not a list."),
                     }
                 }
