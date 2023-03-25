@@ -19,6 +19,8 @@ enum S {
     Lambda,
     Func { symbol: String, body: Box<S> },
     Greater,
+    Defmacro,
+    Macro { arglist: Box<S>, body: Box<S> },
 }
 
 impl S {
@@ -47,6 +49,25 @@ impl S {
             _ => Err("Not cons"),
         }
     }
+    fn length(&self) -> Result<i32, &'static str> {
+        let mut length = 0;
+        let mut list = self.clone();
+        loop {
+            match list {
+                S::Nil => break,
+                S::Cons { car: _, cdr } => {
+                    length += 1;
+                    list = *cdr.clone();
+                }
+                _ => length = -1,
+            }
+        }
+        if length < 0 {
+            Err("Not a list")
+        } else {
+            Ok(length)
+        }
+    }
     fn as_i32(&self) -> Result<i32, &'static str> {
         match self {
             S::I32(value) => Ok(*value),
@@ -56,7 +77,7 @@ impl S {
     fn as_symbol(&self) -> Result<String, &'static str> {
         match self {
             S::Symbol(value) => Ok(value.clone()),
-            _ => Err("Not i32"),
+            _ => Err("Not symbol"),
         }
     }
     fn as_bool(&self) -> Result<bool, &'static str> {
@@ -148,6 +169,40 @@ impl S {
                 context.insert(symbol, arg);
                 body.evaluate(&context)
             }
+            // (! arglist:list body:any)
+            S::Defmacro => {
+                let arglist = args.car()?;
+                let body = args.cdr()?.car()?.freeze_context(context);
+
+                let mcr = S::Macro {
+                    arglist: Box::new(arglist),
+                    body: Box::new(body),
+                };
+                Ok(mcr)
+            }
+            // (macro arg1 arg2 ..)
+            S::Macro { arglist, body } => {
+                let mut context = context.clone();
+                if args.length()? != arglist.length()? {
+                    return Err("invalid arguments");
+                }
+                let mut args = args;
+                let mut arglist = *arglist;
+                loop {
+                    match args {
+                        S::Nil => break,
+                        S::Cons { car, cdr } => {
+                            let arg = *car;
+                            let symbol = arglist.car()?.as_symbol()?;
+                            context.insert(symbol, arg);
+                            args = *cdr;
+                            arglist = arglist.cdr()?;
+                        }
+                        _ => break,
+                    }
+                }
+                body.evaluate(&context)
+            }
             _ => Err("Invalid apply: List's first element must be applyable."),
         }
     }
@@ -205,6 +260,16 @@ impl S {
                 body.print()
             }
             S::Greater => print!("<"),
+            S::Defmacro => print!("!"),
+            S::Macro {
+                arglist: args,
+                body,
+            } => {
+                print!("! ");
+                args.print();
+                print!(" => ");
+                body.print()
+            }
         }
     }
 
@@ -351,6 +416,7 @@ fn main() {
                     context.insert(String::from("if"), S::If);
                     context.insert(String::from("lambda"), S::Lambda);
                     context.insert(String::from("<"), S::Greater);
+                    context.insert(String::from("!"), S::Defmacro);
                     match s.evaluate(&context) {
                         Err(error) => println!("{error}"),
                         Ok(s) => s.print(),
