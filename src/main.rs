@@ -35,6 +35,37 @@ impl S {
             other => other.clone(),
         }
     }
+    fn car(&self) -> Result<S, &'static str> {
+        match self {
+            S::Cons { car, cdr: _ } => Ok(*car.clone()),
+            _ => Err("Not cons"),
+        }
+    }
+    fn cdr(&self) -> Result<S, &'static str> {
+        match self {
+            S::Cons { car: _, cdr } => Ok(*cdr.clone()),
+            _ => Err("Not cons"),
+        }
+    }
+    fn as_i32(&self) -> Result<i32, &'static str> {
+        match self {
+            S::I32(value) => Ok(*value),
+            _ => Err("Not i32"),
+        }
+    }
+    fn as_symbol(&self) -> Result<String, &'static str> {
+        match self {
+            S::Symbol(value) => Ok(value.clone()),
+            _ => Err("Not i32"),
+        }
+    }
+    fn as_bool(&self) -> Result<bool, &'static str> {
+        match self {
+            S::True => Ok(true),
+            S::False => Ok(false),
+            _ => Err("Not bool"),
+        }
+    }
     fn apply(self, args: S, context: &Context) -> Result<S, &'static str> {
         match self {
             S::Add => {
@@ -50,11 +81,7 @@ impl S {
                                     sum += v;
                                     s = *cdr;
                                 }
-                                _ => {
-                                    return Err(
-                                        "Add Error: non-numeric values cannot be multiplied.",
-                                    )
-                                }
+                                _ => return Err("Add Error: non-numeric values cannot be added."),
                             },
                         },
                         _ => return Err("Add Error: arguments is not a list."),
@@ -68,166 +95,64 @@ impl S {
                 loop {
                     match s {
                         S::Nil => break,
-                        S::Cons { car, cdr } => match car.evaluate(&context) {
-                            Err(error) => return Err(error),
-                            Ok(car) => match car {
-                                S::I32(v) => {
-                                    prod *= v;
-                                    s = *cdr;
-                                }
-                                _ => {
-                                    return Err(
-                                        "Mul Error: non-numeric values cannot be multiplied.",
-                                    )
-                                }
-                            },
-                        },
+                        S::Cons { car, cdr } => {
+                            let value = car.evaluate(&context)?.as_i32()?;
+                            prod *= value;
+                            s = *cdr;
+                        }
                         _ => return Err("Mul Error: arguments is not a list."),
                     }
                 }
                 Ok(S::I32(prod))
             }
-            S::Greater => match args {
-                S::Cons { car, cdr } => match car.evaluate(context) {
-                    Ok(s) => match s {
-                        S::I32(lval) => match *cdr {
-                            S::Cons { car, cdr } => match car.evaluate(context) {
-                                Ok(s) => match s {
-                                    S::I32(rval) => match *cdr {
-                                        S::Nil => {
-                                            if lval < rval {
-                                                Ok(S::True)
-                                            } else {
-                                                Ok(S::False)
-                                            }
-                                        }
-                                        _ => {
-                                            todo!("Error handling")
-                                        }
-                                    },
-                                    _ => {
-                                        todo!("Error handling")
-                                    }
-                                },
-                                Err(error) => {
-                                    todo!()
-                                }
-                            },
-                            _ => {
-                                todo!("Error handling")
-                            }
-                        },
-                        _ => {
-                            todo!("Error handling")
-                        }
-                    },
-                    Err(error) => {
-                        todo!()
-                    }
-                },
-                _ => {
-                    todo!("Error handling")
-                }
-            },
-            S::Let => {
-                let mut context = context.clone();
-                match args {
-                    S::Cons { car, cdr } => match *car {
-                        S::Symbol(symbol) => match *cdr {
-                            S::Cons { car, cdr } => match car.evaluate(&context) {
-                                Err(error) => Err(error),
-                                Ok(s) => {
-                                    context.insert(symbol, s);
-                                    match *cdr {
-                                        S::Cons { car, cdr } => match *cdr {
-                                            S::Nil => car.evaluate(&context),
-                                            S::Cons { car: _, cdr: _ } => {
-                                                Err("Let Error: too many arguments.")
-                                            }
-                                            _ => Err("Let Error: arguments is not a list."),
-                                        },
-                                        S::Nil => Err("Let Error: too few arguments."),
-                                        _ => Err("Let Error: arguments is not a list."),
-                                    }
-                                }
-                            },
-                            S::Nil => Err("Let Error: too few arguments."),
-                            _ => Err("Let Error: arguments is not a list."),
-                        },
-                        _ => Err("Let Error: first argument must be a symbol."),
-                    },
-                    _ => Err("Let Error: arguments is not a list."),
+            // (< lhs:to-i32 rhs:to-i32)
+            S::Greater => {
+                let lhs = args.car()?.evaluate(&context)?.as_i32()?;
+                let rhs = args.cdr()?.car()?.evaluate(&context)?.as_i32()?;
+
+                if lhs < rhs {
+                    Ok(S::True)
+                } else {
+                    Ok(S::False)
                 }
             }
-            S::If => match args {
-                S::Cons { car, cdr } => match car.evaluate(&context) {
-                    Err(error) => Err(error),
-                    Ok(s) => match s {
-                        S::True => match *cdr {
-                            S::Cons { car, cdr } => match *cdr {
-                                S::Cons { car: _, cdr } => match *cdr {
-                                    S::Nil => car.evaluate(&context),
-                                    S::Cons { car: _, cdr: _ } => {
-                                        Err("If Error: too many arguments.")
-                                    }
-                                    _ => Err("If Error: arguments is not a list."),
-                                },
-                                S::Nil => Err("If Error: too few arguments."),
-                                _ => Err("If Error: arguments is not a list."),
-                            },
-                            S::Nil => Err("If Error: too few arguments."),
-                            _ => Err("If Error: arguments is not a list."),
-                        },
-                        S::False => match *cdr {
-                            S::Cons { car: _, cdr } => match *cdr {
-                                S::Cons { car, cdr } => match *cdr {
-                                    S::Nil => car.evaluate(&context),
-                                    S::Cons { car: _, cdr: _ } => {
-                                        Err("If Error: too many arguments.")
-                                    }
-                                    _ => Err("If Error: arguments is not a list."),
-                                },
-                                S::Nil => Err("If Error: too few arguments."),
-                                _ => Err("If Error: arguments is not a list."),
-                            },
-                            S::Nil => Err("If Error: too few arguments."),
-                            _ => Err("If Error: arguments is not a list."),
-                        },
-                        _ => Err("If Error: first argument must be a boolean."),
-                    },
-                },
-                S::Nil => Err("If Error: too few arguments."),
-                _ => Err("If Error: arguments is not a list."),
-            },
-            S::Lambda => match args {
-                S::Cons { car, cdr } => match *car {
-                    S::Symbol(symbol) => match *cdr {
-                        S::Cons { car, cdr } => match *cdr {
-                            S::Nil => Ok(S::Func { symbol, body: car }),
-                            S::Cons { car: _, cdr: _ } => Err("Lambda Error: too many arguments."),
-                            _ => Err("Lambda Error: arguments is not a list."),
-                        },
-                        S::Nil => Err("Lambda Error: too few arguments."),
-                        _ => Err("Lambda Error: arguments is not a list."),
-                    },
-                    _ => Err("Lambda Error: first argument must be a symbol."),
-                },
-                S::Nil => Err("Lambda Error: too few arguments."),
-                _ => Err("Lambda Error: arguments is not a list."),
-            },
-            S::Func { symbol, body } => match args {
-                S::Cons { car, cdr } => match *cdr {
-                    S::Nil => {
-                        let mut context = context.clone();
-                        context.insert(symbol, *car);
-                        body.evaluate(&context)
-                    }
-                    S::Cons { car: _, cdr: _ } => Err("Func Error: too many arguments."),
-                    _ => Err("Func Error: arguments is not a list."),
-                },
-                S::Nil => Err("Func Error: too few arguments."),
-                _ => Err("Func Error: arguments is not a list."),
-            },
+            // (let ident:symbol value:any body:any )
+            S::Let => {
+                let mut context = context.clone();
+                let ident = args.car()?.as_symbol()?;
+                let value = args.cdr()?.car()?.evaluate(&context)?;
+                context.insert(ident, value);
+                let body = args.cdr()?.cdr()?.car()?;
+                body.evaluate(&context)
+            }
+            // (if con:to-bool then:any els:any)
+            S::If => {
+                let con = args.car()?.evaluate(context)?.as_bool()?;
+                let then = args.cdr()?.car()?;
+                let els = args.cdr()?.cdr()?.car()?;
+
+                if con {
+                    then.evaluate(context)
+                } else {
+                    els.evaluate(context)
+                }
+            }
+            // (lambda arg:symbol body:any)
+            S::Lambda => {
+                let arg = args.car()?.as_symbol()?;
+                let body = args.cdr()?.car()?;
+                Ok(S::Func {
+                    symbol: arg,
+                    body: Box::new(body),
+                })
+            }
+            // (function arg:any)
+            S::Func { symbol, body } => {
+                let arg = args.car()?.evaluate(context)?;
+                let mut context = context.clone();
+                context.insert(symbol, arg);
+                body.evaluate(&context)
+            }
             _ => Err("Invalid apply: List's first element must be applyable."),
         }
     }
@@ -291,15 +216,11 @@ impl S {
     fn append(self, s: S) -> Result<S, &'static str> {
         match self {
             S::Cons { car, cdr } => {
-                let car = car;
-                let cdr = cdr.append(s);
-                match cdr {
-                    Ok(cdr) => Ok(S::Cons {
-                        car,
-                        cdr: Box::new(cdr),
-                    }),
-                    Err(error) => Err(error),
-                }
+                let cdr = cdr.append(s)?;
+                Ok(S::Cons {
+                    car,
+                    cdr: Box::new(cdr),
+                })
             }
             S::Nil => Ok(S::Cons {
                 car: Box::new(s),
