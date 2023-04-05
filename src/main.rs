@@ -21,6 +21,9 @@ enum S {
     Greater,
     Defmacro,
     Macro { arglist: Box<S>, body: Box<S> },
+    // Commands
+    Define,
+    DefineCommand { symbol: String, expr: Box<S> },
 }
 
 impl S {
@@ -203,6 +206,16 @@ impl S {
                 }
                 body.evaluate(&context)
             }
+            // (define ident expr)
+            S::Define => {
+                let ident = args.car()?.as_symbol()?;
+                let expr = args.cdr()?.car()?;
+                let define_command = S::DefineCommand {
+                    symbol: ident,
+                    expr: Box::new(expr),
+                };
+                Ok(define_command)
+            }
             _ => Err("Invalid apply: List's first element must be applyable."),
         }
     }
@@ -269,6 +282,11 @@ impl S {
                 args.print();
                 print!(" => ");
                 body.print()
+            }
+            S::Define => print!("DEFINE"),
+            S::DefineCommand { symbol, expr } => {
+                print!("define ident: {symbol} expr: ");
+                expr.print();
             }
         }
     }
@@ -405,6 +423,7 @@ fn main() {
     context.insert(String::from("lambda"), S::Lambda);
     context.insert(String::from("<"), S::Greater);
     context.insert(String::from("!"), S::Defmacro);
+    context.insert(String::from("define"), S::Define);
     loop {
         let mut buf = String::new();
         if let Err(error) = stdin().read_line(&mut buf) {
@@ -429,6 +448,9 @@ fn main() {
 
         match s.evaluate(&context) {
             Err(error) => println!("{error}"),
+            Ok(S::DefineCommand { symbol, expr }) => {
+                context.insert(symbol, *expr);
+            }
             Ok(s) => {
                 s.print();
                 println!("")
