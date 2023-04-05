@@ -395,33 +395,43 @@ fn tokenize(target: &str) -> Result<Vec<Token>, &'static str> {
 }
 
 fn main() {
-    let mut buf = String::new();
-    if let Err(error) = stdin().read_line(&mut buf) {
-        println!("{error}");
-        return;
-    }
-    match tokenize(buf.as_str()) {
-        Err(error) => println!("{error}"),
-        Ok(tokens) => {
-            let mut tokens = tokens.iter().peekable();
-            match parse(&mut tokens) {
-                Err(error) => println!("{error}"),
-                Ok(s) => {
-                    let mut context = Context::new();
-                    context.insert(String::from("+"), S::Add);
-                    context.insert(String::from("*"), S::Mul);
-                    context.insert(String::from("let"), S::Let);
-                    context.insert(String::from("true"), S::True);
-                    context.insert(String::from("false"), S::False);
-                    context.insert(String::from("if"), S::If);
-                    context.insert(String::from("lambda"), S::Lambda);
-                    context.insert(String::from("<"), S::Greater);
-                    context.insert(String::from("!"), S::Defmacro);
-                    match s.evaluate(&context) {
-                        Err(error) => println!("{error}"),
-                        Ok(s) => s.print(),
-                    }
-                }
+    let mut context = Context::new();
+    context.insert(String::from("+"), S::Add);
+    context.insert(String::from("*"), S::Mul);
+    context.insert(String::from("let"), S::Let);
+    context.insert(String::from("true"), S::True);
+    context.insert(String::from("false"), S::False);
+    context.insert(String::from("if"), S::If);
+    context.insert(String::from("lambda"), S::Lambda);
+    context.insert(String::from("<"), S::Greater);
+    context.insert(String::from("!"), S::Defmacro);
+    loop {
+        let mut buf = String::new();
+        if let Err(error) = stdin().read_line(&mut buf) {
+            println!("{error}");
+            return;
+        }
+        let tokens = match tokenize(buf.as_str()) {
+            Ok(tokens) => tokens,
+            Err(err) => {
+                println!("{err}");
+                continue;
+            }
+        };
+        let mut tokens = tokens.iter().peekable();
+        let s = match parse(&mut tokens) {
+            Ok(s) => s,
+            Err(err) => {
+                println!("{err}");
+                continue;
+            }
+        };
+
+        match s.evaluate(&context) {
+            Err(error) => println!("{error}"),
+            Ok(s) => {
+                s.print();
+                println!("")
             }
         }
     }
