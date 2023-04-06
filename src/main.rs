@@ -225,7 +225,7 @@ impl S {
             // (define ident expr)
             S::Define => {
                 let ident = args.first()?.as_symbol()?;
-                let expr = args.second()?;
+                let expr = args.second()?.evaluate(context)?;
                 let define_command = S::DefineCommand {
                     symbol: ident,
                     expr: Box::new(expr),
