@@ -320,26 +320,12 @@ fn parse(tokens: &mut Peekable<Iter<Token>>) -> Result<S, &'static str> {
                 tokens.next();
                 match tokens.peek() {
                     None => return Err("Missing close parenthesis"),
-                    Some(Token::CP) => {
-                        break;
-                    }
-                    Some(Token::Num(v)) => match list.append(S::I32(*v)) {
-                        Ok(l) => list = l,
-                        Err(error) => return Err(error),
-                    },
-                    Some(Token::Symbol(symbol)) => match list.append(S::Symbol(symbol.clone())) {
-                        Ok(l) => list = l,
-                        Err(error) => return Err(error),
-                    },
+                    Some(Token::CP) => break,
+                    Some(Token::Num(v)) => list = list.append(S::I32(*v))?,
+                    Some(Token::Symbol(symbol)) => list = list.append(S::Symbol(symbol.clone()))?,
                     Some(Token::OP) => {
-                        let parsed = parse(tokens);
-                        match parsed {
-                            Err(error) => return Err(error),
-                            Ok(s) => match list.append(s) {
-                                Ok(l) => list = l,
-                                Err(error) => return Err(error),
-                            },
-                        }
+                        let parsed = parse(tokens)?;
+                        list = list.append(parsed)?;
                     }
                 }
             }
