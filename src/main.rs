@@ -9,6 +9,7 @@ enum S {
     Cons { car: Box<S>, cdr: Box<S> },
     Nil,
     I32(i32),
+    String(String),
     Symbol(String),
     List,
     Car,
@@ -281,6 +282,7 @@ impl S {
             }
             S::Nil => print!("()"),
             S::I32(v) => print!("{v}"),
+            S::String(string) => print!("\"{string}\""),
             S::Symbol(symbol) => print!("{symbol}"),
             S::List => print!("'"),
             S::Car => print!("CAR"),
@@ -337,6 +339,7 @@ fn parse(tokens: &mut Peekable<Iter<Token>>) -> Result<S, &'static str> {
     match tokens.peek() {
         None => Err("No tokens"),
         Some(Token::Num(v)) => Ok(S::I32(*v)),
+        Some(Token::String(string)) => Ok(S::String(string.clone())),
         Some(Token::Symbol(symbol)) => Ok(S::Symbol(symbol.clone())),
         Some(Token::OP) => {
             let mut list = S::Nil;
@@ -346,6 +349,7 @@ fn parse(tokens: &mut Peekable<Iter<Token>>) -> Result<S, &'static str> {
                     None => return Err("Missing close parenthesis"),
                     Some(Token::CP) => break,
                     Some(Token::Num(v)) => list = list.append(S::I32(*v))?,
+                    Some(Token::String(string)) => list = list.append(S::String(string.clone()))?,
                     Some(Token::Symbol(symbol)) => list = list.append(S::Symbol(symbol.clone()))?,
                     Some(Token::OP) => {
                         let parsed = parse(tokens)?;
@@ -364,6 +368,7 @@ enum Token {
     OP,
     Num(i32),
     Symbol(String),
+    String(String),
     CP,
 }
 
@@ -376,6 +381,17 @@ fn read_i32(chars: &mut Peekable<Chars>) -> Result<i32, ParseIntError> {
         digits.push(chars.next().unwrap());
     }
     digits.parse::<i32>()
+}
+
+fn read_string(chars: &mut Peekable<Chars>) -> String {
+    let mut string = String::new();
+    while match chars.peek() {
+        None => false,
+        Some(c) => *c != '"',
+    } {
+        string.push(chars.next().unwrap());
+    }
+    string
 }
 
 fn read_symbol(chars: &mut Peekable<Chars>) -> String {
@@ -402,6 +418,15 @@ fn tokenize(target: &str) -> Result<Vec<Token>, &'static str> {
             }
             Some(')') => {
                 tokens.push(Token::CP);
+                target.next();
+                continue;
+            }
+            Some('"') => {
+                target.next();
+                tokens.push(Token::String(read_string(&mut target)));
+                if target.peek() != Some(&'"') {
+                    return Err("Invalid string literal");
+                }
                 target.next();
                 continue;
             }
