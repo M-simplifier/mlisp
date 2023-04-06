@@ -10,6 +10,7 @@ enum S {
     Nil,
     I32(i32),
     Symbol(String),
+    List,
     Add,
     Mul,
     Let,
@@ -101,6 +102,7 @@ impl S {
     }
     fn apply(self, args: S, context: &Context) -> Result<S, &'static str> {
         match self {
+            S::List => Ok(args),
             S::Add => {
                 let mut sum = 0;
                 let mut s = args;
@@ -270,6 +272,7 @@ impl S {
             S::Nil => print!("()"),
             S::I32(v) => print!("{v}"),
             S::Symbol(symbol) => print!("{symbol}"),
+            S::List => print!("'"),
             S::Add => print!("ADD"),
             S::Mul => print!("MUL"),
             S::Let => print!("LET"),
@@ -409,6 +412,7 @@ fn tokenize(target: &str) -> Result<Vec<Token>, &'static str> {
 
 fn main() {
     let mut context = Context::new();
+    context.insert(String::from("'"), S::List);
     context.insert(String::from("+"), S::Add);
     context.insert(String::from("*"), S::Mul);
     context.insert(String::from("let"), S::Let);
