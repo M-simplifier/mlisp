@@ -1,0 +1,14 @@
+(define f
+    (! (n) (if (= n 0)
+                1
+                (* n (f (- n 1))))))
+
+(define defmacro
+    (! (name args body) 
+        (define name
+            (! args body))))
+
+(defmacro add (a b) (+ a b))
+(defmacro factorial (n) (if (= n 0)
+                            1
+                            (* n (factorial (- n 1)))))
