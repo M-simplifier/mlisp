@@ -23,6 +23,7 @@ enum S {
     If,
     Lambda,
     Func { symbol: String, body: Box<S> },
+    Equal,
     Greater,
     Defmacro,
     Macro { arglist: Box<S>, body: Box<S> },
@@ -154,6 +155,17 @@ impl S {
                     }
                 }
                 Ok(S::I32(prod))
+            }
+            // (= lhs:to-i32 rhs:to-i32)
+            S::Equal => {
+                let lhs = args.first()?.evaluate(&context)?.as_i32()?;
+                let rhs = args.second()?.evaluate(&context)?.as_i32()?;
+
+                if lhs == rhs {
+                    Ok(S::True)
+                } else {
+                    Ok(S::False)
+                }
             }
             // (< lhs:to-i32 rhs:to-i32)
             S::Greater => {
@@ -314,6 +326,7 @@ impl S {
                 print!("λ {symbol} . ");
                 body.print()
             }
+            S::Equal => print!("="),
             S::Greater => print!("<"),
             S::Defmacro => print!("!"),
             S::Macro {
@@ -475,6 +488,7 @@ fn load_pre_symbols(context: &mut Context) {
     context.insert(String::from("false"), S::False);
     context.insert(String::from("if"), S::If);
     context.insert(String::from("lambda"), S::Lambda);
+    context.insert(String::from("="), S::Equal);
     context.insert(String::from("<"), S::Greater);
     context.insert(String::from("!"), S::Defmacro);
     context.insert(String::from("define"), S::Define);
