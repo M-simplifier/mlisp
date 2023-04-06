@@ -52,6 +52,15 @@ impl S {
             _ => Err("Not cons"),
         }
     }
+    fn first(&self) -> Result<S, &'static str> {
+        self.car()
+    }
+    fn second(&self) -> Result<S, &'static str> {
+        self.cdr()?.car()
+    }
+    fn third(&self) -> Result<S, &'static str> {
+        self.cdr()?.cdr()?.car()
+    }
     fn length(&self) -> Result<i32, &'static str> {
         let mut length = 0;
         let mut list = self.clone();
@@ -126,8 +135,8 @@ impl S {
             }
             // (< lhs:to-i32 rhs:to-i32)
             S::Greater => {
-                let lhs = args.car()?.evaluate(&context)?.as_i32()?;
-                let rhs = args.cdr()?.car()?.evaluate(&context)?.as_i32()?;
+                let lhs = args.first()?.evaluate(&context)?.as_i32()?;
+                let rhs = args.second()?.evaluate(&context)?.as_i32()?;
 
                 if lhs < rhs {
                     Ok(S::True)
@@ -138,17 +147,17 @@ impl S {
             // (let ident:symbol value:any body:any )
             S::Let => {
                 let mut context = context.clone();
-                let ident = args.car()?.as_symbol()?;
-                let value = args.cdr()?.car()?.evaluate(&context)?;
+                let ident = args.first()?.as_symbol()?;
+                let value = args.second()?.evaluate(&context)?;
                 context.insert(ident, value);
-                let body = args.cdr()?.cdr()?.car()?;
+                let body = args.third()?;
                 body.evaluate(&context)
             }
             // (if con:to-bool then:any els:any)
             S::If => {
-                let con = args.car()?.evaluate(context)?.as_bool()?;
-                let then = args.cdr()?.car()?;
-                let els = args.cdr()?.cdr()?.car()?;
+                let con = args.first()?.evaluate(context)?.as_bool()?;
+                let then = args.second()?;
+                let els = args.third()?;
 
                 if con {
                     then.evaluate(context)
@@ -158,8 +167,8 @@ impl S {
             }
             // (lambda arg:symbol body:any)
             S::Lambda => {
-                let arg = args.car()?.as_symbol()?;
-                let body = args.cdr()?.car()?;
+                let arg = args.first()?.as_symbol()?;
+                let body = args.second()?;
                 Ok(S::Func {
                     symbol: arg,
                     body: Box::new(body),
@@ -167,15 +176,15 @@ impl S {
             }
             // (function arg:any)
             S::Func { symbol, body } => {
-                let arg = args.car()?.evaluate(context)?;
+                let arg = args.first()?.evaluate(context)?;
                 let mut context = context.clone();
                 context.insert(symbol, arg);
                 body.evaluate(&context)
             }
             // (! arglist:list body:any)
             S::Defmacro => {
-                let arglist = args.car()?;
-                let body = args.cdr()?.car()?.freeze_context(context);
+                let arglist = args.first()?;
+                let body = args.second()?.freeze_context(context);
 
                 let mcr = S::Macro {
                     arglist: Box::new(arglist),
@@ -196,7 +205,7 @@ impl S {
                         S::Nil => break,
                         S::Cons { car, cdr } => {
                             let arg = *car;
-                            let symbol = arglist.car()?.as_symbol()?;
+                            let symbol = arglist.first()?.as_symbol()?;
                             context.insert(symbol, arg);
                             args = *cdr;
                             arglist = arglist.cdr()?;
@@ -208,8 +217,8 @@ impl S {
             }
             // (define ident expr)
             S::Define => {
-                let ident = args.car()?.as_symbol()?;
-                let expr = args.cdr()?.car()?;
+                let ident = args.first()?.as_symbol()?;
+                let expr = args.second()?;
                 let define_command = S::DefineCommand {
                     symbol: ident,
                     expr: Box::new(expr),
