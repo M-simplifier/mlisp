@@ -16,6 +16,7 @@ enum S {
     Car,
     Cdr,
     Add,
+    Sub,
     Mul,
     Let,
     True,
@@ -139,6 +140,13 @@ impl S {
                     }
                 }
                 Ok(S::I32(sum))
+            }
+            // (- n m)
+            S::Sub => {
+                let lhs = args.first()?.evaluate(context)?.as_i32()?;
+                let rhs = args.second()?.evaluate(context)?.as_i32()?;
+
+                Ok(S::I32(lhs - rhs))
             }
             S::Mul => {
                 let mut prod = 1;
@@ -316,6 +324,7 @@ impl S {
             S::Car => print!("CAR"),
             S::Cdr => print!("CDR"),
             S::Add => print!("ADD"),
+            S::Sub => print!("SUB"),
             S::Mul => print!("MUL"),
             S::Let => print!("LET"),
             S::True => print!("TRUE"),
@@ -482,6 +491,7 @@ fn load_pre_symbols(context: &mut Context) {
     context.insert(String::from("car"), S::Car);
     context.insert(String::from("cdr"), S::Cdr);
     context.insert(String::from("+"), S::Add);
+    context.insert(String::from("-"), S::Sub);
     context.insert(String::from("*"), S::Mul);
     context.insert(String::from("let"), S::Let);
     context.insert(String::from("true"), S::True);
