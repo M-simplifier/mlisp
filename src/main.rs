@@ -1,5 +1,6 @@
 use std::{
-    collections::HashMap, io::stdin, iter::Peekable, num::ParseIntError, slice::Iter, str::Chars,
+    collections::HashMap, fs, io::stdin, iter::Peekable, num::ParseIntError, slice::Iter,
+    str::Chars,
 };
 
 type Context = HashMap<String, S>;
@@ -28,6 +29,8 @@ enum S {
     // Commands
     Define,
     DefineCommand { symbol: String, expr: Box<S> },
+    Load,
+    LoadCommand { file_path: String },
 }
 
 impl S {
@@ -88,6 +91,12 @@ impl S {
         match self {
             S::I32(value) => Ok(*value),
             _ => Err("Not i32"),
+        }
+    }
+    fn as_string(&self) -> Result<String, &'static str> {
+        match self {
+            S::String(string) => Ok(string.clone()),
+            _ => Err("Not string"),
         }
     }
     fn as_symbol(&self) -> Result<String, &'static str> {
@@ -238,6 +247,13 @@ impl S {
                 };
                 Ok(define_command)
             }
+            // (load filepath:string)
+            S::Load => {
+                let filepath = args.first()?.as_string()?;
+                Ok(S::LoadCommand {
+                    file_path: filepath,
+                })
+            }
             _ => Err("Invalid apply: List's first element must be applyable."),
         }
     }
@@ -314,6 +330,8 @@ impl S {
                 print!("define ident: {symbol} expr: ");
                 expr.print();
             }
+            S::Load => print!("LOAD"),
+            S::LoadCommand { file_path } => print!("load '{file_path}'"),
         }
     }
 
@@ -336,7 +354,7 @@ impl S {
 }
 
 fn parse(tokens: &mut Peekable<Iter<Token>>) -> Result<S, &'static str> {
-    match tokens.peek() {
+    match tokens.next() {
         None => Err("No tokens"),
         Some(Token::Num(v)) => Ok(S::I32(*v)),
         Some(Token::String(string)) => Ok(S::String(string.clone())),
@@ -344,16 +362,15 @@ fn parse(tokens: &mut Peekable<Iter<Token>>) -> Result<S, &'static str> {
         Some(Token::OP) => {
             let mut list = S::Nil;
             loop {
-                tokens.next();
                 match tokens.peek() {
                     None => return Err("Missing close parenthesis"),
-                    Some(Token::CP) => break,
-                    Some(Token::Num(v)) => list = list.append(S::I32(*v))?,
-                    Some(Token::String(string)) => list = list.append(S::String(string.clone()))?,
-                    Some(Token::Symbol(symbol)) => list = list.append(S::Symbol(symbol.clone()))?,
-                    Some(Token::OP) => {
-                        let parsed = parse(tokens)?;
-                        list = list.append(parsed)?;
+                    Some(Token::CP) => {
+                        tokens.next();
+                        break;
+                    }
+                    _ => {
+                        let s = parse(tokens)?;
+                        list = list.append(s)?;
                     }
                 }
             }
@@ -447,8 +464,7 @@ fn tokenize(target: &str) -> Result<Vec<Token>, &'static str> {
     Ok(tokens)
 }
 
-fn main() {
-    let mut context = Context::new();
+fn load_pre_symbols(context: &mut Context) {
     context.insert(String::from("'"), S::List);
     context.insert(String::from("car"), S::Car);
     context.insert(String::from("cdr"), S::Cdr);
@@ -462,20 +478,45 @@ fn main() {
     context.insert(String::from("<"), S::Greater);
     context.insert(String::from("!"), S::Defmacro);
     context.insert(String::from("define"), S::Define);
-    loop {
-        let mut buf = String::new();
-        if let Err(error) = stdin().read_line(&mut buf) {
-            println!("{error}");
+    context.insert(String::from("load"), S::Load);
+}
+
+fn interpreter(s: S, context: &mut Context) {
+    match s.evaluate(&context) {
+        Err(error) => println!("{error}"),
+        Ok(S::DefineCommand { symbol, expr }) => {
+            context.insert(symbol, *expr);
+        }
+        Ok(S::LoadCommand { file_path }) => {
+            let script = match fs::read_to_string(file_path) {
+                Ok(string) => string,
+                Err(err) => {
+                    println!("{err}");
+                    return;
+                }
+            };
+            interpret_string(script, context)
+        }
+        Ok(s) => {
+            s.print();
+            println!("")
+        }
+    }
+}
+
+fn interpret_string(string: String, context: &mut Context) {
+    let tokens = match tokenize(string.as_str()) {
+        Ok(tokens) => tokens,
+        Err(err) => {
+            println!("{err}");
             return;
         }
-        let tokens = match tokenize(buf.as_str()) {
-            Ok(tokens) => tokens,
-            Err(err) => {
-                println!("{err}");
-                continue;
-            }
-        };
-        let mut tokens = tokens.iter().peekable();
+    };
+    let mut tokens = tokens.iter().peekable();
+    while match tokens.peek() {
+        None => false,
+        _ => true,
+    } {
         let s = match parse(&mut tokens) {
             Ok(s) => s,
             Err(err) => {
@@ -483,16 +524,19 @@ fn main() {
                 continue;
             }
         };
+        interpreter(s, context);
+    }
+}
 
-        match s.evaluate(&context) {
-            Err(error) => println!("{error}"),
-            Ok(S::DefineCommand { symbol, expr }) => {
-                context.insert(symbol, *expr);
-            }
-            Ok(s) => {
-                s.print();
-                println!("")
-            }
+fn main() {
+    let mut context = Context::new();
+    load_pre_symbols(&mut context);
+    loop {
+        let mut buf = String::new();
+        if let Err(error) = stdin().read_line(&mut buf) {
+            println!("{error}");
+            return;
         }
+        interpret_string(buf, &mut context);
     }
 }
