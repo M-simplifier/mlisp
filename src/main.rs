@@ -12,6 +12,7 @@ enum S {
     Symbol(String),
     List,
     Car,
+    Cdr,
     Add,
     Mul,
     Let,
@@ -107,6 +108,10 @@ impl S {
             S::Car => {
                 let list = args.car()?;
                 list.evaluate(context)?.car()
+            }
+            S::Cdr => {
+                let list = args.car()?;
+                list.evaluate(context)?.cdr()
             }
             S::Add => {
                 let mut sum = 0;
@@ -279,6 +284,7 @@ impl S {
             S::Symbol(symbol) => print!("{symbol}"),
             S::List => print!("'"),
             S::Car => print!("CAR"),
+            S::Cdr => print!("CDR"),
             S::Add => print!("ADD"),
             S::Mul => print!("MUL"),
             S::Let => print!("LET"),
@@ -420,6 +426,7 @@ fn main() {
     let mut context = Context::new();
     context.insert(String::from("'"), S::List);
     context.insert(String::from("car"), S::Car);
+    context.insert(String::from("cdr"), S::Cdr);
     context.insert(String::from("+"), S::Add);
     context.insert(String::from("*"), S::Mul);
     context.insert(String::from("let"), S::Let);
