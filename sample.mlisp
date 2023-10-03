@@ -4,8 +4,8 @@
                 (* n (f (- n 1))))))
 
 (define defmacro
-    (! (name args body) 
-        (define name
+    (! (ident args body) 
+        (define ident 
             (! args body))))
 
 (defmacro add (a b) (+ a b))
